@@ -1,0 +1,286 @@
+// EduHub Pakistan — Prisma schema
+// Full-stack MERN-style data model (using SQLite in sandbox, swappable to MongoDB/Postgres in prod)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH ============
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String // bcrypt hashed
+  name         String
+  phone        String?
+  role         String   @default("student") // student | academy | teacher | admin
+  avatar       String?
+  bio          String?
+  address      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations (role-dependent)
+  academy      Academy?
+  teacher      Teacher?
+  reviews      Review[]
+  notifications Notification[]
+  favorites    Favorite[]
+  inquiries    Inquiry[]
+  admissions   Admission[]
+  aiHistory    AIRecommendation[]
+}
+
+// ============ ACADEMY ============
+
+model Academy {
+  id            String   @id @default(cuid())
+  ownerId       String   @unique
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name          String
+  slug          String   @unique
+  logo          String? // emoji or URL
+  coverColor    String   @default("linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)")
+  rating        Float    @default(0)
+  reviewsCount  Int      @default(0)
+  city          String
+  area          String
+  address       String
+  phone         String
+  email         String
+  website       String?
+  description   String
+  category      String
+  feeRange      String
+  minFee        Int      @default(0)
+  maxFee        Int      @default(0)
+  distance      Float    @default(0) // km from reference point
+  timings       String
+  verified      Boolean  @default(false)
+  latitude      Float?
+  longitude     Float?
+  totalStudents Int      @default(0)
+  totalTeachers Int      @default(0)
+  profileViews  Int      @default(0)
+  status        String   @default("active") // active | suspended | pending
+  galleryJson   String   @default("[]") // JSON stringified array of {emoji, gradient, title}
+  facilitiesJson String  @default("[]") // JSON stringified array of strings
+  coursesListJson String @default("[]") // JSON stringified array of course names (denormalized for quick filter)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  courses       Course[]
+  teachers      Teacher[]
+  students      Student[]
+  reviews       Review[]
+  announcements Announcement[]
+  admissions    Admission[]
+  inquiries     Inquiry[]
+  favorites     Favorite[]
+  scholarships  Scholarship[]
+}
+
+// ============ TEACHER ============
+
+model Teacher {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  userId        String?  @unique // optional link to User account (for teacher login)
+  user          User?    @relation(fields: [userId], references: [id])
+
+  name          String
+  qualification String
+  experience    String
+  specialization String
+  phone         String
+  email         String
+  avatar        String?
+  assignedCourseIdsJson String @default("[]") // JSON array of course IDs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  students      Student[]
+}
+
+// ============ STUDENT ============
+
+model Student {
+  id            String   @id @default(cuid())
+  academyId     String?
+  academy       Academy? @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  teacherId     String?
+  teacher       Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  name          String
+  rollNumber    String
+  course        String
+  teacherName   String? // denormalized teacher name for quick display
+  phone         String
+  email         String
+  gender        String   @default("male") // male | female | other
+  address       String?
+  admissionDate String
+  status        String   @default("active") // active | inactive | graduated
+  attendance    Int      @default(0) // percentage
+  progress      Int      @default(0) // percentage
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============ COURSE ============
+
+model Course {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  name          String
+  duration      String
+  fee           Int
+  description   String
+  instructor    String
+  seats         Int      @default(30)
+  enrolled      Int      @default(0)
+  status        String   @default("active") // active | inactive | full
+  category      String   @default("General")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============ REVIEW ============
+
+model Review {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  studentName   String
+  rating        Int
+  comment       String
+  reply         String?
+  date          DateTime @default(now())
+}
+
+// ============ ANNOUNCEMENT ============
+
+model Announcement {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  title         String
+  content       String
+  published     Boolean  @default(true)
+  date          DateTime @default(now())
+}
+
+// ============ ADMISSION ============
+
+model Admission {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  studentName   String
+  course        String
+  fee           Int
+  status        String   @default("pending") // pending | confirmed | rejected
+  date          DateTime @default(now())
+}
+
+// ============ INQUIRY ============
+
+model Inquiry {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  studentName   String
+  email         String
+  phone         String
+  course        String
+  message       String
+  status        String   @default("pending") // pending | responded | closed
+  date          DateTime @default(now())
+}
+
+// ============ NOTIFICATION ============
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title         String
+  message       String
+  type          String   @default("info") // info | success | warning | error
+  read          Boolean  @default(false)
+  date          DateTime @default(now())
+}
+
+// ============ FAVORITE (saved academies) ============
+
+model Favorite {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  date          DateTime @default(now())
+
+  @@unique([userId, academyId])
+}
+
+// ============ AI RECOMMENDATION HISTORY ============
+
+model AIRecommendation {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type          String   // recommend | compare | career | summarize
+  inputsJson    String   // JSON of inputs
+  outputsJson   String   // JSON of outputs
+  date          DateTime @default(now())
+}
+
+// ============ SCHOLARSHIP ============
+
+model Scholarship {
+  id            String   @id @default(cuid())
+  academyId     String
+  academy       Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  title         String
+  description   String
+  amount        String   // e.g. "50%", "Rs 25,000", "Full"
+  eligibility   String
+  deadline      String   // date string
+  status        String   @default("active") // active | closed
+  date          DateTime @default(now())
+}
+
+// ============ CATEGORY (admin-managed academy categories) ============
+
+model Category {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  slug          String   @unique
+  icon          String   @default("📚") // emoji
+  color         String   @default("#2563EB")
+  description   String?
+  createdAt     DateTime @default(now())
+}
